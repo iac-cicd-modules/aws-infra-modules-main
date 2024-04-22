@@ -187,78 +187,27 @@ resource "aws_route_table_association" "database-route-3-association" {
   subnet_id      = aws_subnet.database-subnet-3.id
 }
 
-resource "aws_eip" "elastic-ip-for-nat-gw1" {
-
+resource "aws_eip" "elastic-ip-for-nat-gw" {
   tags = {
-    Name = "ip-nat-${var.name}-${var.environment}-${var.region}a"
+    Name = "ip-nat-${var.name}-${var.environment}-${var.region}"
   }
-
 }
 
-resource "aws_eip" "elastic-ip-for-nat-gw2" {
+resource "aws_nat_gateway" "nat-gw" {
+  allocation_id = aws_eip.elastic-ip-for-nat-gw.id
+  subnet_id     = aws_subnet.public-subnet-1.id  # Change this line to use a public subnet
 
   tags = {
-    Name = "ip-nat-${var.name}-${var.environment}-${var.region}b"
+    Name = "nat-${var.name}-${var.environment}-${var.region}"
   }
-
 }
 
-resource "aws_eip" "elastic-ip-for-nat-gw3" {
-
-  tags = {
-    Name = "ip-nat-${var.name}-${var.environment}-${var.region}c"
-  }
-
-}
-
-resource "aws_nat_gateway" "nat-gw1" {
-  allocation_id = aws_eip.elastic-ip-for-nat-gw1.id
-  subnet_id     = aws_subnet.public-subnet-1.id
-
-  tags = {
-    Name = "nat-${var.name}-${var.environment}-${var.region}a"
-  }
-
-}
-
-resource "aws_nat_gateway" "nat-gw2" {
-  allocation_id = aws_eip.elastic-ip-for-nat-gw2.id
-  subnet_id     = aws_subnet.public-subnet-2.id
-
-  tags = {
-    Name = "nat-${var.name}-${var.environment}-${var.region}b"
-  }
-
-}
-
-resource "aws_nat_gateway" "nat-gw3" {
-  allocation_id = aws_eip.elastic-ip-for-nat-gw3.id
-  subnet_id     = aws_subnet.public-subnet-3.id
-
-  tags = {
-    Name = "nat-${var.name}-${var.environment}-${var.region}c"
-  }
-
-}
-
-resource "aws_route" "nat-gw-route1" {
-  route_table_id         = aws_route_table.private-route-table1.id
-  nat_gateway_id         = aws_nat_gateway.nat-gw1.id
+resource "aws_route" "nat-gw-route" {
+  count                  = 3
+  route_table_id         = element([aws_route_table.private-route-table1.id, aws_route_table.private-route-table2.id, aws_route_table.private-route-table3.id], count.index)
+  nat_gateway_id         = aws_nat_gateway.nat-gw.id
   destination_cidr_block = "0.0.0.0/0"
 }
-
-resource "aws_route" "nat-gw-route2" {
-  route_table_id         = aws_route_table.private-route-table2.id
-  nat_gateway_id         = aws_nat_gateway.nat-gw2.id
-  destination_cidr_block = "0.0.0.0/0"
-}
-
-resource "aws_route" "nat-gw-route3" {
-  route_table_id         = aws_route_table.private-route-table3.id
-  nat_gateway_id         = aws_nat_gateway.nat-gw3.id
-  destination_cidr_block = "0.0.0.0/0"
-}
-
 
 resource "aws_internet_gateway" "terraform-igw" {
   vpc_id = aws_vpc.main.id
@@ -329,19 +278,8 @@ output "name" {
 
 }
 
-output "public_subnets" {
-  value = [aws_subnet.public-subnet-1.id,aws_subnet.public-subnet-2.id,aws_subnet.public-subnet-3.id]
-  
-}
-
 output "private_subnets" {
   value = [aws_subnet.private-subnet-1.id, aws_subnet.private-subnet-2.id, aws_subnet.private-subnet-3.id]
-}
-
-
-output "database_subnets" {
-  value = [aws_subnet.database-subnet-1.id,aws_subnet.database-subnet-2.id,aws_subnet.database-subnet-3.id]
-  
 }
 
 output "route_tables" {
