@@ -1,0 +1,30 @@
+version: 0.2
+run-as: root
+
+
+phases:
+  pre_build:
+    commands:
+      - SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION)
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+  build:
+    commands:
+      - aws s3 cp $S3_URI .env 
+      - docker login -u kxcsuporte -p a6mk8qOBb38i
+      - echo Build started on `date`
+      - echo Building the Docker image...          
+      - docker build -f $DOCKER_PATH -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$SHA .
+  post_build:
+    commands:
+  #    - aws s3 cp $ENV_PATH $S3_URI   #Se houver arquivo .env no S3
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$SHA
+      - docker tag $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$SHA $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest
+      - echo Writing image definitions file...
+      - printf '[{"name":"%s","imageUri":"%s"}]' $CONTAINER_NAME $REPOSITORY_URI:$SHA> imagedefinitions.json
+artifacts:
+    files: imagedefinitions.json
