@@ -1,190 +1,116 @@
 resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
+  for_each             = var.vpcs
+  cidr_block           = var.vpcs[each.key].cidr_block
   enable_dns_hostnames = true
 
   tags = {
-    Name = "vpc-${var.name}-${var.environment}-${var.region}"
+    Name = "vpc-${var.vpcs[each.key].name}-${var.environment}-${var.region}"
   }
 }
 
-resource "aws_subnet" "public-subnet-1" {
-  cidr_block              = var.public_subnet_1_cidr
-  vpc_id                  = aws_vpc.main.id
-  availability_zone       = "${var.region}a"
+resource "aws_subnet" "public-subnet" {
+  for_each = merge([
+    for vpc_key, vpc in var.vpcs : {
+      for subnet_key, subnet in vpc.public_subnets :
+      "${vpc_key}-${subnet_key}" => {
+        vpc           = vpc_key
+        subnet_key    = subnet_key
+        subnet_config = subnet
+      }
+    }
+  ]...)
+
+  vpc_id                  = aws_vpc.main[each.value.vpc].id
+  cidr_block              = each.value.subnet_config.cidr_block
+  availability_zone       = "${var.region}${each.value.subnet_config.az}"
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "subnet-a-pub-${var.name}-${var.environment}-${var.region}"
+    Name = "subnet-${each.value.subnet_config.az}-pub-${var.vpcs[each.value.vpc].name}-${var.environment}-${var.region}"
   }
 }
 
-resource "aws_subnet" "public-subnet-2" {
-  cidr_block              = var.public_subnet_2_cidr
-  vpc_id                  = aws_vpc.main.id
-  availability_zone       = "${var.region}b"
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name = "subnet-b-pub-${var.name}-${var.environment}-${var.region}"
-  }
-}
-
-resource "aws_subnet" "public-subnet-3" {
-  cidr_block              = var.public_subnet_3_cidr
-  vpc_id                  = aws_vpc.main.id
-  availability_zone       = "${var.region}c"
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name = "subnet-c-pub-${var.name}-${var.environment}-${var.region}"
-  }
-}
-
-resource "aws_subnet" "private-subnet-1" {
-  cidr_block              = var.private_subnet_1_cidr
-  vpc_id                  = aws_vpc.main.id
-  availability_zone       = "${var.region}a"
+resource "aws_subnet" "private-subnet" {
+  for_each = merge([
+    for vpc_key, vpc in var.vpcs : {
+      for subnet_key, subnet in vpc.private_subnets :
+      "${vpc_key}-${subnet_key}" => {
+        vpc           = vpc_key
+        subnet_key    = subnet_key
+        subnet_config = subnet
+      }
+    }
+  ]...)
+  vpc_id                  = aws_vpc.main[each.value.vpc].id
+  cidr_block              = each.value.subnet_config.cidr_block
+  availability_zone       = "${var.region}${each.value.subnet_config.az}"
   map_public_ip_on_launch = false
 
   tags = {
-    Name = "subnet-a-priv-${var.name}-${var.environment}-${var.region}"
-  }
-}
-
-resource "aws_subnet" "private-subnet-2" {
-  cidr_block              = var.private_subnet_2_cidr
-  vpc_id                  = aws_vpc.main.id
-  availability_zone       = "${var.region}b"
-  map_public_ip_on_launch = false
-
-  tags = {
-    Name = "subnet-b-priv-${var.name}-${var.environment}-${var.region}"
-  }
-}
-
-resource "aws_subnet" "private-subnet-3" {
-  cidr_block              = var.private_subnet_3_cidr
-  vpc_id                  = aws_vpc.main.id
-  availability_zone       = "${var.region}c"
-  map_public_ip_on_launch = false
-
-  tags = {
-    Name = "subnet-c-priv-${var.name}-${var.environment}-${var.region}"
-  }
-}
-
-resource "aws_subnet" "database-subnet-1" {
-  cidr_block              = var.db_subnet_1_cidr
-  vpc_id                  = aws_vpc.main.id
-  availability_zone       = "${var.region}a"
-  map_public_ip_on_launch = false
-
-  tags = {
-    Name = "subnet-a-database-${var.name}-${var.environment}-${var.region}"
-  }
-}
-
-resource "aws_subnet" "database-subnet-2" {
-  cidr_block              = var.db_subnet_2_cidr
-  vpc_id                  = aws_vpc.main.id
-  availability_zone       = "${var.region}b"
-  map_public_ip_on_launch = false
-
-  tags = {
-    Name = "subnet-b-database-${var.name}-${var.environment}-${var.region}"
-  }
-}
-
-resource "aws_subnet" "database-subnet-3" {
-  cidr_block              = var.db_subnet_3_cidr
-  vpc_id                  = aws_vpc.main.id
-  availability_zone       = "${var.region}c"
-  map_public_ip_on_launch = false
-
-  tags = {
-    Name = "subnet-c-database-${var.name}-${var.environment}-${var.region}"
+    Name = "subnet-${each.value.subnet_config.az}-priv-${var.vpcs[each.value.vpc].name}-${var.environment}-${var.region}"
   }
 }
 
 resource "aws_route_table" "public-route-table" {
-  vpc_id = aws_vpc.main.id
+  for_each = merge([
+    for vpc_key, vpc in var.vpcs : {
+      for subnet_key, subnet in vpc.public_subnets :
+      "${vpc_key}-${subnet_key}" => {
+        vpc_key = vpc_key
+        subnet  = subnet
+      }
+    }
+  ]...)
+  vpc_id = aws_vpc.main[each.value.vpc_key].id
   tags = {
-    Name = "rt-pub-${var.name}-${var.environment}-${var.region}"
+    Name = "rt-pub-${var.vpcs[each.value.vpc_key].name}-${var.environment}-${var.region}"
   }
 }
 
-resource "aws_route_table" "private-route-table1" {
-  vpc_id = aws_vpc.main.id
+resource "aws_route_table" "private-route-table" {
+  for_each = merge([
+    for vpc_key, vpc in var.vpcs : {
+      for subnet_key, subnet in vpc.private_subnets :
+      "${vpc_key}-${subnet_key}" => {
+        vpc_key = vpc_key
+        subnet  = subnet
+      }
+    }
+  ]...)
+
+  vpc_id = aws_vpc.main[each.value.vpc_key].id
+
   tags = {
-    Name = "rt-priv-${var.name}-${var.environment}-${var.region}a"
+    Name = "rt-priv-${var.vpcs[each.value.vpc_key].name}-${var.environment}-${var.region}${each.value.subnet.az}"
   }
 }
 
-resource "aws_route_table" "private-route-table2" {
-  vpc_id = aws_vpc.main.id
-  tags = {
-    Name = "rt-priv-${var.name}-${var.environment}-${var.region}b"
-  }
+resource "aws_route_table_association" "public-route-association" {
+  for_each = merge([
+    for vpc_key, vpc in var.vpcs : {
+      for subnet_key, subnet in vpc.public_subnets :
+      "${vpc_key}-${subnet_key}" => {
+        vpc_key = vpc_key
+        subnet  = subnet
+      }
+    }
+  ]...)
+  route_table_id = aws_route_table.public-route-table[each.key].id
+  subnet_id      = aws_subnet.public-subnet[each.key].id
 }
 
-resource "aws_route_table" "private-route-table3" {
-  vpc_id = aws_vpc.main.id
-  tags = {
-    Name = "rt-priv-${var.name}-${var.environment}-${var.region}c"
-  }
-}
-
-resource "aws_route_table" "database-route-table" {
-  vpc_id = aws_vpc.main.id
-  tags = {
-    Name = "rt-database-${var.name}-${var.environment}-${var.region}"
-  }
-}
-
-
-resource "aws_route_table_association" "public-route-1-association" {
-  route_table_id = aws_route_table.public-route-table.id
-  subnet_id      = aws_subnet.public-subnet-1.id
-}
-
-resource "aws_route_table_association" "public-route-2-association" {
-  route_table_id = aws_route_table.public-route-table.id
-  subnet_id      = aws_subnet.public-subnet-2.id
-}
-
-resource "aws_route_table_association" "public-route-3-association" {
-  route_table_id = aws_route_table.public-route-table.id
-  subnet_id      = aws_subnet.public-subnet-3.id
-}
-
-resource "aws_route_table_association" "private-route-1-association" {
-  route_table_id = aws_route_table.private-route-table1.id
-  subnet_id      = aws_subnet.private-subnet-1.id
-}
-
-resource "aws_route_table_association" "private-route-2-association" {
-  route_table_id = aws_route_table.private-route-table2.id
-  subnet_id      = aws_subnet.private-subnet-2.id
-}
-
-resource "aws_route_table_association" "private-route-3-association" {
-  route_table_id = aws_route_table.private-route-table3.id
-  subnet_id      = aws_subnet.private-subnet-3.id
-}
-
-resource "aws_route_table_association" "database-route-1-association" {
-  route_table_id = aws_route_table.database-route-table.id
-  subnet_id      = aws_subnet.database-subnet-1.id
-}
-
-resource "aws_route_table_association" "database-route-2-association" {
-  route_table_id = aws_route_table.database-route-table.id
-  subnet_id      = aws_subnet.database-subnet-2.id
-}
-
-resource "aws_route_table_association" "database-route-3-association" {
-  route_table_id = aws_route_table.database-route-table.id
-  subnet_id      = aws_subnet.database-subnet-3.id
+resource "aws_route_table_association" "private-route-association" {
+  for_each = merge([
+    for vpc_key, vpc in var.vpcs : {
+      for subnet_key, subnet in vpc.private_subnets :
+      "${vpc_key}-${subnet_key}" => {
+        vpc_key = vpc_key
+        subnet  = subnet
+      }
+    }
+  ]...)
+  route_table_id = aws_route_table.private-route-table[each.key].id
+  subnet_id      = aws_subnet.private-subnet[each.key].id
 }
 
 resource "aws_eip" "elastic-ip-for-nat-gw" {
@@ -195,7 +121,7 @@ resource "aws_eip" "elastic-ip-for-nat-gw" {
 
 resource "aws_nat_gateway" "nat-gw" {
   allocation_id = aws_eip.elastic-ip-for-nat-gw.id
-  subnet_id     = aws_subnet.public-subnet-1.id  # Change this line to use a public subnet
+  subnet_id     = element([for subnet in aws_subnet.public-subnet : subnet.id], 0)
 
   tags = {
     Name = "nat-${var.name}-${var.environment}-${var.region}"
@@ -203,89 +129,35 @@ resource "aws_nat_gateway" "nat-gw" {
 }
 
 resource "aws_route" "nat-gw-route" {
-  count                  = 3
-  route_table_id         = element([aws_route_table.private-route-table1.id, aws_route_table.private-route-table2.id, aws_route_table.private-route-table3.id], count.index)
+  for_each = {
+    for rt_key, rt in aws_route_table.private-route-table : rt_key => rt.id
+  }
+
+  route_table_id         = each.value
   nat_gateway_id         = aws_nat_gateway.nat-gw.id
   destination_cidr_block = "0.0.0.0/0"
 }
 
 resource "aws_internet_gateway" "terraform-igw" {
-  vpc_id = aws_vpc.main.id
+  for_each = var.vpcs
+  vpc_id   = aws_vpc.main[each.key].id
   tags = {
-    Name = "igw-${var.name}-${var.environment}"
+    Name = "igw-${var.vpcs[each.key].name}-${var.environment}"
   }
 }
 
 resource "aws_route" "public-internet-igw-route" {
-  route_table_id         = aws_route_table.public-route-table.id
-  gateway_id             = aws_internet_gateway.terraform-igw.id
+  for_each = merge([
+    for vpc_key, vpc in var.vpcs : {
+      for subnet_key, subnet in vpc.public_subnets :
+      "${vpc_key}-${subnet_key}" => {
+        vpc_key = vpc_key
+        subnet  = subnet
+      }
+    }
+  ]...)
+  route_table_id         = aws_route_table.public-route-table[each.key].id
+  gateway_id             = aws_internet_gateway.terraform-igw[each.value.vpc_key].id
   destination_cidr_block = "0.0.0.0/0"
 }
 
-resource "aws_vpc_endpoint" "s3" {
-  vpc_id       = aws_vpc.main.id
-  service_name = "com.amazonaws.${var.region}.s3"
-}
-
-resource "aws_vpc_endpoint_route_table_association" "main" {
-  route_table_id  = aws_route_table.database-route-table.id
-  vpc_endpoint_id = aws_vpc_endpoint.s3.id
-}
-
-
-output "vpc_id" {
-  value = aws_vpc.main.id
-}
-
-output "public_subnet-1_id" {
-  value = aws_subnet.public-subnet-1.id
-}
-
-output "public_subnet-2_id" {
-  value = aws_subnet.public-subnet-2.id
-}
-
-output "public_subnet-3_id" {
-  value = aws_subnet.public-subnet-3.id
-}
-
-output "private_subnet-1_id" {
-  value = aws_subnet.private-subnet-1.id
-}
-
-output "private_subnet-2_id" {
-  value = aws_subnet.private-subnet-2.id
-}
-
-output "private_subnet-3_id" {
-  value = aws_subnet.private-subnet-3.id
-}
-
-output "database_subnet-1_id" {
-  value = aws_subnet.database-subnet-1.id
-}
-
-output "database_subnet-2_id" {
-  value = aws_subnet.database-subnet-2.id
-}
-
-output "database_subnet-3_id" {
-  value = aws_subnet.database-subnet-3.id
-}
-
-output "name" {
-  value = aws_vpc.main.tags["Name"]
-
-}
-
-output "private_subnets" {
-  value = [aws_subnet.private-subnet-1.id, aws_subnet.private-subnet-2.id, aws_subnet.private-subnet-3.id]
-}
-
-output "route_tables" {
-  value = [aws_route_table.private-route-table1.id,
-    aws_route_table.private-route-table2.id,
-    aws_route_table.private-route-table3.id,
-    aws_route_table.public-route-table.id,
-  aws_route_table.database-route-table.id]
-}
