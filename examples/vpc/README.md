@@ -1,39 +1,71 @@
-## Criação de VPC 
+## Criação de VPC
 
 O módulo Terraform vpc é projetado para criar e gerenciar uma Virtual Private Cloud (VPC) na AWS. Este módulo facilita a configuração de uma VPC com sub-redes pública e privada, incluindo sub-redes para bancos de dados, em um ambiente específico.
 
-```
-module "vpc_sample" {
-  source                = "../../modules/vpc"
-  region                = var.region
-  environment           = var.environment
-  name                  = "sample"
-  vpc_cidr              = "10.132.0.0/16"
-  private_subnet_1_cidr = "10.132.0.0/22"
-  private_subnet_2_cidr = "10.132.4.0/22"
-  private_subnet_3_cidr = "10.132.8.0/22"
-  db_subnet_1_cidr      = "10.132.12.0/24"
-  db_subnet_2_cidr      = "10.132.13.0/24"
-  db_subnet_3_cidr      = "10.132.14.0/24"
-  public_subnet_1_cidr  = "10.132.252.0/24"
-  public_subnet_2_cidr  = "10.132.253.0/24"
-  public_subnet_3_cidr  = "10.132.254.0/24"
+```hcl
+module "vpc" {
+  for_each = var.vpcs
+  source   = "./vpc"
+
+  name        = var.vpcs[each.key].name
+  environment = var.environment
+  region      = var.aws_account.region
+  vpcs        = var.vpcs
 }
 ```
 
 ### Parâmetros
 
-* source: O caminho do módulo para o vpc.
-* region: A região da AWS onde a VPC será criada.
-* environment: Ambiente de implantação ("dev","prod").
-* name: Nome da VPC.
-* vpc_cidr: O bloco CIDR da VPC.
-* private_subnet_1_cidr: Bloco CIDR da primeira sub-rede privada.
-* private_subnet_2_cidr: Bloco CIDR da segunda sub-rede privada.
-* private_subnet_3_cidr: Bloco CIDR da terceira sub-rede privada.
-* db_subnet_1_cidr: Bloco CIDR da primeira sub-rede para bancos de dados.
-* db_subnet_2_cidr: Bloco CIDR da segunda sub-rede para bancos de dados.
-* db_subnet_3_cidr: Bloco CIDR da terceira sub-rede para bancos de dados.
-* public_subnet_1_cidr: Bloco CIDR da primeira sub-rede pública.
-* public_subnet_2_cidr: Bloco CIDR da segunda sub-rede pública.
-* public_subnet_3_cidr: Bloco CIDR da terceira sub-rede pública.
+- source: O caminho do módulo para o vpc.
+- region: A região da AWS onde a VPC será criada.
+- environment: Ambiente de implantação ("dev","prod").
+- name: Nome da VPC.
+- vpcs: Mapa de objetos que definem as VPCs.
+
+### Exemplo de definição de um VPC
+
+```hcl
+aws_account = {
+  profile = "sx-dev"
+  region  = "us-east-1"
+}
+
+environment = "dev"
+
+tags = {
+  environment = "dev"
+  name        = "aws-infra-modules"
+}
+
+vpcs = {
+  dev = {
+    cidr_block = "10.1.0.0/16"
+    name       = "apps"
+    private_subnets = {
+      "priv1" = {
+        cidr_block = "10.1.1.0/24"
+        name       = "dev-1"
+        az         = "a"
+      }
+      "priv2" = {
+        cidr_block = "10.1.2.0/24"
+        name       = "dev-2"
+        az         = "b"
+      }
+    }
+    public_subnets = {
+      "pub1" = {
+        cidr_block = "10.1.3.0/24"
+        name       = "dev-1"
+        az         = "a"
+      }
+      "pub2" = {
+        cidr_block = "10.1.4.0/24"
+        name       = "dev-2"
+        az         = "b"
+      }
+    }
+  }
+}
+```
+
